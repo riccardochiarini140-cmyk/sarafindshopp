@@ -86,7 +86,9 @@ import {
     reload,
     updateProfile,
     setPersistence,
-    browserLocalPersistence
+    browserLocalPersistence,
+    GoogleAuthProvider,
+    signInWithPopup
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
     getFirestore,
@@ -128,6 +130,13 @@ window.db     = db;
 window.doc    = doc;
 window.setDoc = setDoc;
 window.getDoc = getDoc;
+
+/* Google Auth globals */
+const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('email');
+googleProvider.addScope('profile');
+window._fbGoogleProvider   = googleProvider;
+window._fbSignInWithPopup  = signInWithPopup;
 
 /* legacy aliases */
 window.auth                           = auth;
@@ -654,6 +663,40 @@ window.firebaseUpdateProfile          = updateProfile;
         .auth-submit-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 25px rgba(6,182,212,0.5); }
         .auth-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         .auth-error { color: #f87171; font-size: 12px; font-weight: 600; text-align: center; margin-bottom: 10px; display: none; padding: 8px 12px; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2); border-radius: 8px; }
+
+        /* ======================================================
+           GOOGLE SIGN-IN BUTTON
+        ====================================================== */
+        .google-signin-btn {
+            width: 100%; padding: 12px 16px; border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.14);
+            color: rgba(255,255,255,0.85); font-weight: 700; font-size: 13px;
+            letter-spacing: 0.3px; cursor: pointer; transition: all 0.22s ease;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            font-family: 'Inter', sans-serif; position: relative; overflow: hidden;
+            margin-bottom: 0;
+        }
+        .google-signin-btn:hover {
+            border-color: rgba(255,255,255,0.32);
+            background: rgba(255,255,255,0.09);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        }
+        .google-signin-btn:active { transform: translateY(0); }
+        .google-signin-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+        .google-signin-btn svg { flex-shrink: 0; }
+
+        .auth-or-divider {
+            display: flex; align-items: center; gap: 10px;
+            margin: 14px 0; font-size: 10px; font-weight: 800;
+            color: rgba(255,255,255,0.2); text-transform: uppercase; letter-spacing: 0.8px;
+        }
+        .auth-or-divider::before, .auth-or-divider::after {
+            content: ''; flex: 1; height: 1px;
+            background: rgba(255,255,255,0.08);
+        }
 
         /* ======================================================
            EMAIL VERIFICATION MODAL  — the MAIN star of the show
@@ -1263,6 +1306,22 @@ window.firebaseUpdateProfile          = updateProfile;
                 <span id="login-resend-label">Resend Email</span>
             </button>
         </div>
+
+        <!-- GOOGLE SIGN IN -->
+        <button id="login-google-btn" class="google-signin-btn" onclick="handleGoogleSignIn('login-modal')">
+            <svg width="17" height="17" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                <path fill="none" d="M0 0h48v48H0z"/>
+            </svg>
+            <span id="login-google-label">Continue with Google</span>
+        </button>
+
+        <!-- DIVIDER -->
+        <div class="auth-or-divider"><span id="login-or-label">or</span></div>
+
         <input type="email"    id="login-email"    class="auth-input" placeholder="Email address" autocomplete="email">
         <input type="password" id="login-password" class="auth-input" placeholder="Password"      autocomplete="current-password">
         <button id="login-submit-btn" onclick="handleLogin()" class="auth-submit-btn">Sign In</button>
@@ -1282,6 +1341,22 @@ window.firebaseUpdateProfile          = updateProfile;
             <div style="height:3px;width:30px;background:#06b6d4;border-radius:4px;margin-top:8px;box-shadow:0 0 10px rgba(6,182,212,0.5)"></div>
         </div>
         <div id="signup-error" class="auth-error"></div>
+
+        <!-- GOOGLE SIGN IN -->
+        <button id="signup-google-btn" class="google-signin-btn" onclick="handleGoogleSignIn('signup-modal')">
+            <svg width="17" height="17" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                <path fill="none" d="M0 0h48v48H0z"/>
+            </svg>
+            <span id="signup-google-label">Continue with Google</span>
+        </button>
+
+        <!-- DIVIDER -->
+        <div class="auth-or-divider"><span id="signup-or-label">or sign up with email</span></div>
+
         <input type="text"     id="signup-username" class="auth-input" placeholder="Username"              autocomplete="username">
         <input type="email"    id="signup-email"    class="auth-input" placeholder="Email address"        autocomplete="email">
         <input type="password" id="signup-password" class="auth-input" placeholder="Password (min 6 chars)" autocomplete="new-password">
@@ -2824,6 +2899,93 @@ window.handleLogout = function() {
     renderAuthArea();
     refreshAllHearts();
     showToast(t('signedOut'));
+};
+
+/* ══════════════════════════════════════════════════════════
+   GOOGLE SIGN-IN
+   Google OAuth popup — works for both Login & Signup.
+   Google accounts are always email-verified, so no
+   verification step is needed.
+══════════════════════════════════════════════════════════ */
+window.handleGoogleSignIn = async function(sourceModalId) {
+    /* Determine which button triggered the call */
+    const btnId  = sourceModalId === 'signup-modal' ? 'signup-google-btn' : 'login-google-btn';
+    const lblId  = sourceModalId === 'signup-modal' ? 'signup-google-label' : 'login-google-label';
+    const btn    = document.getElementById(btnId);
+    const lbl    = document.getElementById(lblId);
+
+    /* Disable button & show loading state */
+    if (btn) { btn.disabled = true; }
+    if (lbl) { lbl.textContent = 'Signing in…'; }
+
+    try {
+        /* Wait for Firebase SDK to be ready */
+        let sdkWait = 0;
+        while ((!window._fbSignInWithPopup || !window._fbGoogleProvider) && sdkWait < 30) {
+            await new Promise(r => setTimeout(r, 200));
+            sdkWait++;
+        }
+        if (!window._fbSignInWithPopup || !window._fbGoogleProvider) {
+            throw { code: 'sdk/not-ready' };
+        }
+
+        /* Set local persistence so session survives browser restarts */
+        if (window._fbSetPersistence && window._fbBrowserLocalPersistence) {
+            try { await window._fbSetPersistence(window._fbAuth, window._fbBrowserLocalPersistence); } catch(e) {}
+        }
+
+        /* Open Google popup */
+        const result  = await window._fbSignInWithPopup(window._fbAuth, window._fbGoogleProvider);
+        const fbUser  = result.user;
+
+        /* Google accounts are always verified — build username from displayName or email */
+        const username = fbUser.displayName
+            || fbUser.email.split('@')[0]
+            || 'User';
+
+        /* Persist username so it survives re-login */
+        localStorage.setItem('sarafinds_pending_username_' + fbUser.email, username);
+
+        /* Save local session */
+        saveSession({ email: fbUser.email, username: username, uid: fbUser.uid });
+
+        /* Sync cloud wishlist */
+        if (typeof syncWishlistFromCloud === 'function') await syncWishlistFromCloud();
+
+        /* Close whichever modal was open */
+        closeAuthModal('login-modal');
+        closeAuthModal('signup-modal');
+
+        /* Refresh UI */
+        renderAuthArea();
+        if (typeof refreshAllHearts === 'function') refreshAllHearts();
+
+        /* Welcome toast */
+        showToast('👋 ' + t('welcomeBack') + ', ' + username.split(' ')[0] + '!');
+
+    } catch (error) {
+        console.error('[SaraFinds] Google sign-in error:', error.code, error.message);
+
+        /* Show error inside the correct modal */
+        const errId = sourceModalId === 'signup-modal' ? 'signup-error' : 'login-error';
+        const errEl = document.getElementById(errId);
+        if (errEl) {
+            let msg = 'Google sign-in failed. Please try again.';
+            if (error.code === 'auth/popup-closed-by-user')      msg = 'Popup closed. Please try again.';
+            if (error.code === 'auth/cancelled-popup-request')   msg = 'Request cancelled. Please try again.';
+            if (error.code === 'auth/popup-blocked')             msg = 'Popup was blocked. Please allow popups for this site.';
+            if (error.code === 'auth/account-exists-with-different-credential') msg = 'An account already exists with this email using a different sign-in method.';
+            if (error.code === 'sdk/not-ready')                  msg = 'Service not ready. Please refresh and try again.';
+            errEl.textContent = msg;
+            errEl.style.display = 'block';
+        }
+    } finally {
+        /* Restore button state */
+        if (btn) { btn.disabled = false; }
+        if (lbl) {
+            lbl.textContent = 'Continue with Google';
+        }
+    }
 };
 
 /* ══════════════════════════════════════════════════════════
